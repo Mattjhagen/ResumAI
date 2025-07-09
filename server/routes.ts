@@ -1,6 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
+import passport from "passport";
 
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
@@ -16,6 +17,39 @@ const upload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // SAML Authentication routes
+  app.get("/api/auth/saml", passport.authenticate("saml"));
+
+  app.post("/api/auth/saml/callback",
+    passport.authenticate("saml", {
+      failureRedirect: "/",
+      failureFlash: false,
+    }),
+    (req, res) => {
+      // On successful authentication, redirect to the home page.
+      res.redirect("/");
+    }
+  );
+
+  app.get("/api/auth/profile", (req, res) => {
+    if (req.isAuthenticated()) {
+      res.json({ user: req.user });
+    } else {
+      res.status(401).json({ message: "Not authenticated" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res, next) => {
+    req.logout((err) => {
+      if (err) { return next(err); }
+      req.session.destroy(() => {
+        // The default cookie name is 'connect.sid'.
+        res.clearCookie("connect.sid");
+        res.json({ message: "Logged out successfully" });
+      });
+    });
+  });
+
   // Upload resume endpoint
   app.post("/api/upload-resume", upload.single("resume"), async (req: MulterRequest, res) => {
     try {

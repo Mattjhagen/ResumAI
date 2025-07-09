@@ -1,19 +1,45 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Code, FileSearch, Palette, Rocket, Check, ExternalLink } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Code, FileSearch, Palette, Rocket, Check, ExternalLink, LogOut } from "lucide-react";
 import { Link } from "wouter";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { AnimatedBackground } from "@/components/animated-background";
 import { UploadZone } from "@/components/upload-zone";
 import { PortfolioCard } from "@/components/portfolio-card";
 
 export default function Home() {
   const [generatedPortfolio, setGeneratedPortfolio] = useState<any>(null);
+  const queryClient = useQueryClient();
 
   const { data: portfolios = [] } = useQuery({
     queryKey: ['/api/portfolios'],
   });
+
+  const { data: authData, isLoading: isAuthLoading } = useQuery({
+    queryKey: ['/api/auth/profile'],
+    queryFn: async () => {
+      try {
+        const res = await fetch('/api/auth/profile');
+        if (res.ok) {
+          return res.json();
+        }
+        return null;
+      } catch (error) {
+        return null;
+      }
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+
+  const user = authData?.user;
+
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    queryClient.invalidateQueries({ queryKey: ['/api/auth/profile'] });
+  };
 
   const handleUploadComplete = (portfolioData: any) => {
     setGeneratedPortfolio(portfolioData);
@@ -45,11 +71,25 @@ export default function Home() {
             </div>
             <span className="text-2xl font-bold">VibeCode</span>
           </div>
-          <nav className="hidden md:flex space-x-6">
+          <nav className="hidden md:flex items-center space-x-6">
             <a href="#generator" className="text-gray-300 hover:text-white transition-colors">Generator</a>
             <a href="#examples" className="text-gray-300 hover:text-white transition-colors">Examples</a>
             <a href="#features" className="text-gray-300 hover:text-white transition-colors">Features</a>
             <a href="http://blog.vibecodes.space/posts/Currentprojects.html" className="text-gray-300 hover:text-white transition-colors">Blog</a>
+            {isAuthLoading ? (
+              <Skeleton className="h-9 w-24 bg-gray-700" />
+            ) : user ? (
+              <div className="flex items-center space-x-3">
+                <span className="text-white font-medium">{user.name}</span>
+                <Button onClick={handleLogout} variant="ghost" size="icon" className="text-gray-300 hover:text-white hover:bg-white/10">
+                  <LogOut size={18} />
+                </Button>
+              </div>
+            ) : (
+              <a href="/api/auth/saml" className="bg-vibe-green hover:bg-vibe-green/80 text-black px-4 py-2 rounded-lg font-semibold transition-all text-sm no-underline">
+                Login
+              </a>
+            )}
           </nav>
         </div>
       </header>
